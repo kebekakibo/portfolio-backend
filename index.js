@@ -4,7 +4,9 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    origin: "https://kebekakibo.github.io"
+}));
 app.get("/", (req, res) => {
     res.send("My portfolio backend is running!");
 });
