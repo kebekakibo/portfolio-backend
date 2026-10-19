@@ -5,6 +5,16 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+app.get("/api/health/config", (req, res) => {
+    res.json({
+        databaseUrlExists: Boolean(process.env.DATABASE_URL),
+        databaseHostConfigured: Boolean(
+            process.env.DATABASE_URL &&
+            !process.env.DATABASE_URL.includes("localhost") &&
+            !process.env.DATABASE_URL.includes("127.0.0.1")
+        )
+    });
+});
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
