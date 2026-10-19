@@ -30,7 +30,7 @@ app.get("/api/health/db", async (req, res) => {
             databaseTime: result.rows[0].now
         });
     } catch (error) {
-        console.error("Database connection failed:", error.message);
+        console.error("Database connection failed:", error);
 
         res.status(500).json({
             connected: false,
