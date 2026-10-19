@@ -1,70 +1,61 @@
+require("dotenv").config();
 
+const { Pool } = require("pg");
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
-
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 app.use(cors({
-    origin: "https://kebekakibo.github.io"
+    origin: [
+        "https://kebekakibo.github.io",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500"
+    ]
 }));
 app.get("/", (req, res) => {
     res.send("My portfolio backend is running!");
 });
+app.get("/api/health/db", async (req, res) => {
+    try {
+        const result = await pool.query("SELECT NOW()");
 
-app.get("/api/projects", (req, res) => {
-    res.json([
-        {
-            id: 1,
-            icon: "📊",
-            status: "PERSONAL PROJECT",
-            name: "Trading Lot Size Calculator",
-            description: "A forex risk-management tool that estimates position size based on account balance, risk percentage, and stop-loss distance.",
-            tags: ["HTML", "CSS", "JavaScript"],
-            actions: [
-                {
-                    text: "Demo Coming Soon",
-                    href: "#projects",
-                    className: "project-link primary",
-                    ariaLabel: "Lot Size Calculator demo coming soon"
-                },
-                {
-                    text: "View Code ↗",
-                    href: "https://github.com/kebekakibo/lot-size-calculator",
-                    className: "project-link secondary",
-                    target: "_blank"
-                }
-            ]
-        },
-        {
-            id: 2,
-            icon: "✓",
-            name: "To-Do List",
-            description: "A simple task manager for organizing daily tasks and tracking completed work.",
-            tags: ["HTML", "CSS", "JavaScript"],
-            actions: [
-                {
-                    text: "View Project →",
-                    href: "#contact",
-                    className: "project-link"
-                }
-            ]
-        },
-        {
-            id: 3,
-            icon: "💻",
-            name: "Personal Portfolio",
-            description: "My personal website to introduce myself and showcase my web development projects.",
-            tags: ["HTML", "CSS"],
-            actions: [
-                {
-                    text: "View Project →",
-                    href: "#home",
-                    className: "project-link"
-                }
-            ]
-        }
-    ]);
+        res.json({
+            connected: true,
+            databaseTime: result.rows[0].now
+        });
+    } catch (error) {
+        console.error("Database connection failed:", error.message);
+
+        res.status(500).json({
+            connected: false,
+            message: "Database connection failed"
+        });
+    }
 });
+
+
+app.get("/api/projects", async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT id, icon, status, name, description, tags, actions FROM projects ORDER BY id"
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Failed to fetch projects:", error.message);
+
+        res.status(500).json({
+            error: "Failed to load projects"
+        });
+    }
+});
+
 
 const PORT = process.env.PORT || 3000;
 
