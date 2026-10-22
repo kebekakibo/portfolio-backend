@@ -5,6 +5,10 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
+app.use(express.json());
+
+
 app.get("/api/health/config", (req, res) => {
     res.json({
         databaseUrlExists: Boolean(process.env.DATABASE_URL),
@@ -45,6 +49,65 @@ app.get("/api/health/db", async (req, res) => {
         res.status(500).json({
             connected: false,
             message: "Database connection failed"
+        });
+    }
+});
+
+app.post("/api/contacts", async (req, res) => {
+    const { name, email, message } = req.body;
+
+    // Check that all fields were provided.
+    if (
+        typeof name !== "string" ||
+        typeof email !== "string" ||
+        typeof message !== "string" ||
+        !name.trim() ||
+        !email.trim() ||
+        !message.trim()
+    ) {
+        return res.status(400).json({
+            error: "Name, email, and message are required."
+        });
+    }
+
+    // Check reasonable length limits.
+    if (
+        name.trim().length > 100 ||
+        email.trim().length > 255 ||
+        message.trim().length > 5000
+    ) {
+        return res.status(400).json({
+            error: "One or more fields are too long."
+        });
+    }
+
+    // Basic email-format check.
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(email.trim())) {
+        return res.status(400).json({
+            error: "Please enter a valid email address."
+        });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO contacts (name, email, message)
+             VALUES ($1, $2, $3)
+             RETURNING id, created_at`,
+            [name.trim(), email.trim(), message.trim()]
+        );
+
+        res.status(201).json({
+            message: "Your message was received successfully.",
+            contactId: result.rows[0].id,
+            receivedAt: result.rows[0].created_at
+        });
+    } catch (error) {
+        console.error("Failed to save contact message:", error.message);
+
+        res.status(500).json({
+            error: "Unable to send your message right now."
         });
     }
 });
