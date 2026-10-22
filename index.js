@@ -6,7 +6,7 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 const contactLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 5,
@@ -63,6 +63,9 @@ app.get("/api/health/db", async (req, res) => {
 
 app.post("/api/contacts", contactLimiter, async (req, res) => {
     const { name, email, message, website } = req.body;
+    const cleanName = typeof name === "string" ? name.trim() : "";
+const cleanEmail = typeof email === "string" ? email.trim() : "";
+const cleanMessage = typeof message === "string" ? message.trim() : "";
 // Ignore submissions that fill in the honeypot field.
 if (typeof website === "string" && website.trim() !== "") {
     return res.status(200).json({
@@ -70,25 +73,18 @@ if (typeof website === "string" && website.trim() !== "") {
     });
 }
     // Check that all fields were provided.
-    if (
-        typeof name !== "string" ||
-        typeof email !== "string" ||
-        typeof message !== "string" ||
-        !name.trim() ||
-        !email.trim() ||
-        !message.trim()
-    ) {
+   if (!cleanName || !cleanEmail || !cleanMessage) {
         return res.status(400).json({
             error: "Name, email, and message are required."
         });
     }
 
     // Check reasonable length limits.
-    if (
-        name.trim().length > 100 ||
-        email.trim().length > 255 ||
-        message.trim().length > 5000
-    ) {
+   if (
+    cleanName.length > 100 ||
+    cleanEmail.length > 255 ||
+    cleanMessage.length > 5000
+) {
         return res.status(400).json({
             error: "One or more fields are too long."
         });
@@ -97,7 +93,7 @@ if (typeof website === "string" && website.trim() !== "") {
     // Basic email-format check.
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!emailPattern.test(email.trim())) {
+    if (!emailPattern.test(cleanEmail)) {
         return res.status(400).json({
             error: "Please enter a valid email address."
         });
@@ -108,7 +104,7 @@ if (typeof website === "string" && website.trim() !== "") {
             `INSERT INTO contacts (name, email, message)
              VALUES ($1, $2, $3)
              RETURNING id, created_at`,
-            [name.trim(), email.trim(), message.trim()]
+                [cleanName, cleanEmail, cleanMessage]
         );
 
         res.status(201).json({
@@ -142,7 +138,25 @@ app.get("/api/projects", async (req, res) => {
     }
 });
 
+app.use((err, req, res, next) => {
+    if (err.type === "entity.too.large") {
+        return res.status(413).json({
+            error: "Request body is too large. Please reduce the size of your message."
+        });
+    }
 
+    if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+        return res.status(400).json({
+            error: "Invalid JSON request body."
+        });
+    }
+
+    console.error("Unexpected server error:", err.message);
+
+    res.status(500).json({
+        error: "Something went wrong on the server."
+    });
+});
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
