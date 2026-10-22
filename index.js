@@ -62,8 +62,13 @@ app.get("/api/health/db", async (req, res) => {
 });
 
 app.post("/api/contacts", contactLimiter, async (req, res) => {
-    const { name, email, message } = req.body;
-
+    const { name, email, message, website } = req.body;
+// Ignore submissions that fill in the honeypot field.
+if (typeof website === "string" && website.trim() !== "") {
+    return res.status(200).json({
+        message: "Your message was received successfully."
+    });
+}
     // Check that all fields were provided.
     if (
         typeof name !== "string" ||
