@@ -3,11 +3,19 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const express = require("express");
 const cors = require("cors");
-
+const rateLimit = require("express-rate-limit");
 const app = express();
 
 app.use(express.json());
-
+const contactLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        error: "Too many messages. Please try again in 15 minutes."
+    }
+});
 
 app.get("/api/health/config", (req, res) => {
     res.json({
@@ -53,7 +61,7 @@ app.get("/api/health/db", async (req, res) => {
     }
 });
 
-app.post("/api/contacts", async (req, res) => {
+app.post("/api/contacts", contactLimiter, async (req, res) => {
     const { name, email, message } = req.body;
 
     // Check that all fields were provided.
