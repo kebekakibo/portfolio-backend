@@ -3,6 +3,18 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const express = require("express");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD
+    }
+});
+
+
+
 const rateLimit = require("express-rate-limit");
 const app = express();
 
@@ -99,19 +111,48 @@ if (typeof website === "string" && website.trim() !== "") {
         });
     }
 
+    
     try {
+        // Step 1: Save the contact message in PostgreSQL.
         const result = await pool.query(
             `INSERT INTO contacts (name, email, message)
              VALUES ($1, $2, $3)
              RETURNING id, created_at`,
-                [cleanName, cleanEmail, cleanMessage]
+            [cleanName, cleanEmail, cleanMessage]
         );
 
+        // Step 2: Send an email notification.
+        try {
+            await transporter.sendMail({
+                from: process.env.GMAIL_USER,
+                to: process.env.CONTACT_NOTIFICATION_EMAIL,
+                replyTo: cleanEmail,
+                subject: "New portfolio contact message",
+                text: `You received a new message through your portfolio.
+
+Name: ${cleanName}
+Email: ${cleanEmail}
+
+Message:
+${cleanMessage}`
+            });
+
+            console.log("Contact notification email sent successfully.");
+        } catch (emailError) {
+            // The message is already saved, even if email fails.
+            console.error(
+                "Contact saved, but email notification failed:",
+                emailError.message
+            );
+        }
+
+        // Step 3: Respond to the visitor.
         res.status(201).json({
             message: "Your message was received successfully.",
             contactId: result.rows[0].id,
             receivedAt: result.rows[0].created_at
         });
+
     } catch (error) {
         console.error("Failed to save contact message:", error.message);
 
