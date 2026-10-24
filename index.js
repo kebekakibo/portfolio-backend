@@ -3,15 +3,9 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 
 
@@ -122,29 +116,32 @@ if (typeof website === "string" && website.trim() !== "") {
         );
 
         // Step 2: Send an email notification.
-        try {
-            await transporter.sendMail({
-                from: process.env.GMAIL_USER,
-                to: process.env.CONTACT_NOTIFICATION_EMAIL,
-                replyTo: cleanEmail,
-                subject: "New portfolio contact message",
-                text: `You received a new message through your portfolio.
+try {
+    const { data, error } = await resend.emails.send({
+        from: "Portfolio Notifications <onboarding@resend.dev>",
+        to: [process.env.CONTACT_NOTIFICATION_EMAIL],
+        replyTo: cleanEmail,
+        subject: "New portfolio contact message",
+        text: `You received a new message through your portfolio.
 
 Name: ${cleanName}
 Email: ${cleanEmail}
 
 Message:
 ${cleanMessage}`
-            });
+    });
 
-            console.log("Contact notification email sent successfully.");
-        } catch (emailError) {
-            // The message is already saved, even if email fails.
-            console.error(
-                "Contact saved, but email notification failed:",
-                emailError.message
-            );
-        }
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    console.log("Contact notification email sent successfully:", data.id);
+} catch (emailError) {
+    console.error(
+        "Contact saved, but email notification failed:",
+        emailError.message
+    );
+}
 
         // Step 3: Respond to the visitor.
         res.status(201).json({
